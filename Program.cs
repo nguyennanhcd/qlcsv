@@ -66,13 +66,18 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     {
         try
         {
-            var uri = new Uri(renderConn);
+            // Replace postgres:// with postgresql:// for proper URI parsing
+            var uriString = renderConn.Replace("postgres://", "postgresql://");
+            var uri = new Uri(uriString);
             var db = uri.AbsolutePath.Trim('/');
             var userInfo = uri.UserInfo.Split(':');
-            conn = $"Host={uri.Host};Port={uri.Port};Database={db};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
+            var port = uri.Port > 0 ? uri.Port : 5432; // Default to 5432 if port not specified
+            conn = $"Host={uri.Host};Port={port};Database={db};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
         }
-        catch
+        catch (Exception ex)
         {
+            // Log the error for debugging
+            Console.WriteLine($"Failed to parse DATABASE_URL: {ex.Message}");
             // If parsing fails, try using as-is
             conn = renderConn;
         }
