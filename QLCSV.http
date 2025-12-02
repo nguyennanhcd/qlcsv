@@ -1,0 +1,6 @@
+@QLCSV_HostAddress = http://localhost:5085
+
+GET {{QLCSV_HostAddress}}
+Accept: application/json
+
+###
