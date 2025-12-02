@@ -127,6 +127,22 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+// Create database tables if they don't exist
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<AppDbContext>();
+        context.Database.EnsureCreated();
+        Console.WriteLine("✅ Database tables created successfully!");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Database Error: {ex.Message}");
+    }
+}
+
 // Global exception handling (MUST be first)
 app.UseGlobalExceptionHandler();
 
