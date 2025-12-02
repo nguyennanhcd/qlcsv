@@ -160,39 +160,5 @@ namespace QLCSV.Controllers.Auth
                 }
             });
         }
-
-        // TEMPORARY: Create first admin user - REMOVE AFTER USE!
-        [HttpPost("create-admin")]
-        public async Task<ActionResult> CreateAdmin([FromBody] RegisterRequest request)
-        {
-            // Check if any admin exists
-            if (await _context.Users.AnyAsync(u => u.Role == "admin"))
-                return BadRequest(new { success = false, message = "Admin already exists" });
-
-            // Check if email is already used
-            if (await _context.Users.AnyAsync(u => u.Email == request.Email))
-                return Conflict(new { success = false, message = "Email already in use" });
-
-            var admin = new User
-            {
-                Email = request.Email,
-                FullName = request.FullName,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                Role = "admin",
-                IsActive = true
-            };
-
-            _context.Users.Add(admin);
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                success = true,
-                message = "Admin created successfully! PLEASE REMOVE THIS ENDPOINT NOW!",
-                userId = admin.Id,
-                email = admin.Email,
-                role = admin.Role
-            });
-        }
     }
 }
