@@ -72,32 +72,33 @@ namespace QLCSV.Controllers
                 .OrderByDescending(u => u.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
-                .Select(u => new UserResponse
-                {
-                    Id = u.Id,
-                    Email = u.Email,
-                    FullName = u.FullName,
-                    AvatarUrl = u.AvatarUrl,
-                    Role = u.Role,
-                    IsActive = u.IsActive,
-                    CreatedAt = u.CreatedAt,
-                    UpdatedAt = u.UpdatedAt,
-
-                    HasProfile = u.AlumniProfile != null,
-                    StudentId = u.AlumniProfile != null ? u.AlumniProfile.StudentId : null,
-                    GraduationYear = u.AlumniProfile != null ? u.AlumniProfile.GraduationYear : (int?)null,
-
-                    FacultyId = u.AlumniProfile != null ? u.AlumniProfile.FacultyId : (int?)null,
-                    FacultyName = u.AlumniProfile != null ? u.AlumniProfile.Faculty?.Name : null,
-
-                    MajorId = u.AlumniProfile != null ? u.AlumniProfile.MajorId : (int?)null,
-                    MajorName = u.AlumniProfile != null ? u.AlumniProfile.Major?.Name : null
-                })
                 .ToListAsync();
+
+            var userResponses = users.Select(u => new UserResponse
+            {
+                Id = u.Id,
+                Email = u.Email,
+                FullName = u.FullName,
+                AvatarUrl = u.AvatarUrl,
+                Role = u.Role,
+                IsActive = u.IsActive,
+                CreatedAt = u.CreatedAt,
+                UpdatedAt = u.UpdatedAt,
+
+                HasProfile = u.AlumniProfile != null,
+                StudentId = u.AlumniProfile?.StudentId,
+                GraduationYear = u.AlumniProfile?.GraduationYear,
+
+                FacultyId = u.AlumniProfile?.FacultyId,
+                FacultyName = u.AlumniProfile?.Faculty?.Name,
+
+                MajorId = u.AlumniProfile?.MajorId,
+                MajorName = u.AlumniProfile?.Major?.Name
+            }).ToList();
 
             return Ok(new PagedResult<UserResponse>
             {
-                Items = users,
+                Items = userResponses,
                 TotalCount = totalCount,
                 PageNumber = pageNumber,
                 PageSize = pageSize
@@ -136,10 +137,10 @@ namespace QLCSV.Controllers
                 GraduationYear = user.AlumniProfile?.GraduationYear,
 
                 FacultyId = user.AlumniProfile?.FacultyId,
-                FacultyName = user.AlumniProfile?.Faculty?.Name,
+                FacultyName = user.AlumniProfile?.Faculty?.Name ?? null,
 
                 MajorId = user.AlumniProfile?.MajorId,
-                MajorName = user.AlumniProfile?.Major?.Name
+                MajorName = user.AlumniProfile?.Major?.Name ?? null
             };
 
             return Ok(response);

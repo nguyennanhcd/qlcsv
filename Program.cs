@@ -139,7 +139,7 @@ builder.WebHost.ConfigureKestrel(options =>
 
 var app = builder.Build();
 
-// Handle database initialization/migration
+// Apply database migrations
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -149,104 +149,13 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<AppDbContext>();
         
-        // Check if we can connect to the database
-        var canConnect = await context.Database.CanConnectAsync();
-        
-        if (!canConnect)
-        {
-            logger.LogInformation("Creating new database...");
-            await context.Database.MigrateAsync();
-            Console.WriteLine("✅ Database created successfully!");
-        }
-        else
-        {
-            // Database exists - check if it was created with EnsureCreated or has migrations
-            var hasTablesButNoMigrations = false;
-            
-            try
-            {
-                // Try to check if tables exist
-                var tablesExist = await context.Users.AnyAsync();
-                var appliedMigrations = await context.Database.GetAppliedMigrationsAsync();
-                
-                // If we have tables but no migration history, database was created with EnsureCreated
-                hasTablesButNoMigrations = !appliedMigrations.Any();
-            }
-            catch
-            {
-                // If we get here, tables might not exist or other issue
-                hasTablesButNoMigrations = false;
-            }
-            
-            if (hasTablesButNoMigrations)
-            {
-                // Production database created with EnsureCreated - add columns manually
-                logger.LogInformation("Detected existing database. Ensuring schema compatibility...");
-                
-                try
-                {
-                    // Add new columns if they don't exist (PostgreSQL safe syntax)
-                    await context.Database.ExecuteSqlRawAsync(@"
-                        DO $$ 
-                        BEGIN
-                            -- Add email verification columns
-                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                          WHERE table_name='users' AND column_name='EmailVerified') THEN
-                                ALTER TABLE users ADD COLUMN ""EmailVerified"" boolean NOT NULL DEFAULT false;
-                            END IF;
-                            
-                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                          WHERE table_name='users' AND column_name='EmailVerificationToken') THEN
-                                ALTER TABLE users ADD COLUMN ""EmailVerificationToken"" text;
-                            END IF;
-                            
-                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                          WHERE table_name='users' AND column_name='EmailVerificationTokenExpiry') THEN
-                                ALTER TABLE users ADD COLUMN ""EmailVerificationTokenExpiry"" timestamp with time zone;
-                            END IF;
-                            
-                            -- Add password reset columns
-                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                          WHERE table_name='users' AND column_name='PasswordResetToken') THEN
-                                ALTER TABLE users ADD COLUMN ""PasswordResetToken"" text;
-                            END IF;
-                            
-                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                          WHERE table_name='users' AND column_name='PasswordResetTokenExpiry') THEN
-                                ALTER TABLE users ADD COLUMN ""PasswordResetTokenExpiry"" timestamp with time zone;
-                            END IF;
-                        END $$;
-                    ");
-                    
-                    Console.WriteLine("✅ Database schema updated successfully!");
-                }
-                catch (Exception schemaEx)
-                {
-                    logger.LogWarning(schemaEx, "Could not update schema automatically");
-                    Console.WriteLine("⚠️  Schema update skipped - database may need manual migration");
-                }
-            }
-            else
-            {
-                // Normal migration flow
-                var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
-                
-                if (pendingMigrations.Any())
-                {
-                    logger.LogInformation("Applying {Count} pending migration(s)...", pendingMigrations.Count());
-                    await context.Database.MigrateAsync();
-                    Console.WriteLine("✅ Database migrations applied successfully!");
-                }
-                else
-                {
-                    Console.WriteLine("✅ Database is up to date!");
-                }
-            }
-        }
+        logger.LogInformation("Applying database migrations...");
+        await context.Database.MigrateAsync();
+        Console.WriteLine("✅ Database migrations applied successfully!");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Database initialization error");
+        logger.LogError(ex, "Database migration error");
         Console.WriteLine($"⚠️  Database Error: {ex.Message}");
         Console.WriteLine("⚠️  Application will continue. Database operations may fail if schema is incompatible.");
     }

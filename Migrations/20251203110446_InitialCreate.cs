@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace QLCSV.Migrations
 {
     /// <inheritdoc />
-    public partial class InitAll : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -55,6 +55,11 @@ namespace QLCSV.Migrations
                     AvatarUrl = table.Column<string>(type: "text", nullable: true),
                     Role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false, defaultValue: "pending"),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
+                    EmailVerified = table.Column<bool>(type: "boolean", nullable: false),
+                    EmailVerificationToken = table.Column<string>(type: "text", nullable: true),
+                    EmailVerificationTokenExpiry = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    PasswordResetToken = table.Column<string>(type: "text", nullable: true),
+                    PasswordResetTokenExpiry = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
                 },

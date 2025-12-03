@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
-
-namespace QLCSV.Models
+﻿namespace QLCSV.Models
 {
     public class User
     {

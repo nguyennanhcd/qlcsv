@@ -12,8 +12,8 @@ using QLCSV.Data;
 namespace QLCSV.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251126114646_InitAll")]
-    partial class InitAll
+    [Migration("20251203110446_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -305,6 +305,15 @@ namespace QLCSV.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
+                    b.Property<string>("EmailVerificationToken")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("EmailVerificationTokenExpiry")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("EmailVerified")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -319,6 +328,12 @@ namespace QLCSV.Migrations
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
+
+                    b.Property<string>("PasswordResetToken")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("PasswordResetTokenExpiry")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Role")
                         .IsRequired()
