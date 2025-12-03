@@ -86,9 +86,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(conn ?? throw new InvalidOperationException("Connection string not found"));
 });
 
+// HttpClient for EmailService
+builder.Services.AddHttpClient<IEmailService, EmailService>();
+
 // JWT Service
 builder.Services.AddScoped<IJwtService, JwtService>();
-builder.Services.AddScoped<IEmailService, EmailService>();
 
 // Authentication
 builder.Services

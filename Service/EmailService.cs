@@ -1,5 +1,4 @@
-using System.Net;
-using System.Net.Mail;
+using System.Net.Http.Json;
 
 namespace QLCSV.Service
 {
@@ -7,11 +6,13 @@ namespace QLCSV.Service
     {
         private readonly IConfiguration _config;
         private readonly ILogger<EmailService> _logger;
+        private readonly HttpClient _httpClient;
 
-        public EmailService(IConfiguration config, ILogger<EmailService> logger)
+        public EmailService(IConfiguration config, ILogger<EmailService> logger, HttpClient httpClient)
         {
             _config = config;
             _logger = logger;
+            _httpClient = httpClient;
         }
 
         public async Task SendEmailVerificationAsync(string toEmail, string fullName, string verificationToken)
@@ -56,37 +57,34 @@ namespace QLCSV.Service
 
         private async Task SendEmailAsync(string toEmail, string subject, string body)
         {
-            var smtpHost = _config["Smtp:Host"];
-            var smtpPort = _config.GetValue<int>("Smtp:Port");
-            var smtpUser = _config["Smtp:Username"];
-            var smtpPass = _config["Smtp:Password"];
-            var fromEmail = _config["Smtp:FromEmail"];
-            var fromName = _config["Smtp:FromName"];
-
-            if (string.IsNullOrWhiteSpace(smtpHost))
+            var apiKey = _config["Resend:ApiKey"];
+            
+            if (string.IsNullOrWhiteSpace(apiKey))
             {
-                _logger.LogWarning("SMTP not configured. Email not sent to {Email}", toEmail);
+                _logger.LogWarning("Resend API not configured. Email not sent to {Email}", toEmail);
                 return;
             }
 
+            var fromEmail = _config["Resend:FromEmail"] ?? "onboarding@resend.dev";
+            var fromName = _config["Resend:FromName"] ?? "QLCSV";
+
             try
             {
-                using var client = new SmtpClient(smtpHost, smtpPort)
+                var payload = new
                 {
-                    EnableSsl = true,
-                    Credentials = new NetworkCredential(smtpUser, smtpPass)
+                    from = $"{fromName} <{fromEmail}>",
+                    to = new[] { toEmail },
+                    subject = subject,
+                    html = body
                 };
 
-                var mailMessage = new MailMessage
-                {
-                    From = new MailAddress(fromEmail ?? smtpUser!, fromName ?? "QLCSV"),
-                    Subject = subject,
-                    Body = body,
-                    IsBodyHtml = true
-                };
-                mailMessage.To.Add(toEmail);
+                var request = new HttpRequestMessage(HttpMethod.Post, "https://api.resend.com/emails");
+                request.Headers.Add("Authorization", $"Bearer {apiKey}");
+                request.Content = JsonContent.Create(payload);
 
-                await client.SendMailAsync(mailMessage);
+                var response = await _httpClient.SendAsync(request);
+                response.EnsureSuccessStatusCode();
+
                 _logger.LogInformation("Email sent successfully to {Email}", toEmail);
             }
             catch (Exception ex)
