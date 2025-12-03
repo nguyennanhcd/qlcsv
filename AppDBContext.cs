@@ -123,7 +123,7 @@ namespace QLCSV.Data
             modelBuilder.Entity<Batch>(entity =>
             {
                 entity.ToTable("batches");
-                entity.HasIndex(b => b.GraduationYear).IsUnique();
+                entity.HasIndex(b => new { b.GraduationYear, b.Name }).IsUnique();
                 entity.Property(b => b.Name).HasMaxLength(100).IsRequired();
             });
 

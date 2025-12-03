@@ -11,22 +11,13 @@ namespace QLCSV.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = "admin")] // toàn bộ controller chỉ cho admin
-    public class UsersController : ControllerBase
+    public class UsersController : BaseController
     {
         private readonly AppDbContext _context;
 
         public UsersController(AppDbContext context)
         {
             _context = context;
-        }
-
-        // Helper: lấy userId từ token
-        private long? GetCurrentUserId()
-        {
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdClaim)) return null;
-            if (!long.TryParse(userIdClaim, out var userId)) return null;
-            return userId;
         }
 
 

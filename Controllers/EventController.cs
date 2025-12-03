@@ -10,22 +10,13 @@ namespace QLCSV.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class EventsController : ControllerBase
+    public class EventsController : BaseController
     {
         private readonly AppDbContext _context;
 
         public EventsController(AppDbContext context)
         {
             _context = context;
-        }
-
-        // Helper: lấy userId từ token
-        private long? GetCurrentUserId()
-        {
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdClaim)) return null;
-            if (!long.TryParse(userIdClaim, out var userId)) return null;
-            return userId;
         }
 
         // ===================== PUBLIC: LIST & DETAIL =====================

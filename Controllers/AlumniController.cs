@@ -10,7 +10,7 @@ namespace QLCSV.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class AlumniController : ControllerBase
+    public class AlumniController : BaseController
     {
         private readonly AppDbContext _context;
 
@@ -220,15 +220,6 @@ namespace QLCSV.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { Message = "Cập nhật quyền hiển thị thành công", profile.IsPublic });
-        }
-
-        // Helper: lấy userId từ token
-        private long? GetCurrentUserId()
-        {
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdClaim)) return null;
-            if (!long.TryParse(userIdClaim, out var userId)) return null;
-            return userId;
         }
 
         // Helper: map từ entity sang DTO
