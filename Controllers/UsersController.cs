@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QLCSV.Data;
+using QLCSV.DTOs;
 using QLCSV.DTOs.User;
 using System.Security.Claims;
 
@@ -29,12 +30,14 @@ namespace QLCSV.Controllers
         }
 
 
-        // GET: /api/users?role=alumni&isActive=true&search=abc
+        // GET: /api/users?role=alumni&isActive=true&search=abc&pageNumber=1&pageSize=20
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<UserResponse>>> GetUsers(
+        public async Task<ActionResult<PagedResult<UserResponse>>> GetUsers(
             [FromQuery] string? role,
             [FromQuery] bool? isActive,
-            [FromQuery] string? search)
+            [FromQuery] string? search,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 20)
         {
             var query = _context.Users
                 .Include(u => u.AlumniProfile)
@@ -61,8 +64,14 @@ namespace QLCSV.Controllers
                     u.Email.ToLower().Contains(lower));
             }
 
+            var totalCount = await query.CountAsync();
+            pageSize = Math.Min(pageSize, 100);
+            pageNumber = Math.Max(pageNumber, 1);
+
             var users = await query
                 .OrderByDescending(u => u.CreatedAt)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
                 .Select(u => new UserResponse
                 {
                     Id = u.Id,
@@ -79,14 +88,20 @@ namespace QLCSV.Controllers
                     GraduationYear = u.AlumniProfile != null ? u.AlumniProfile.GraduationYear : (int?)null,
 
                     FacultyId = u.AlumniProfile != null ? u.AlumniProfile.FacultyId : (int?)null,
-                    FacultyName = u.AlumniProfile != null ? u.AlumniProfile.Faculty.Name : null,
+                    FacultyName = u.AlumniProfile != null ? u.AlumniProfile.Faculty?.Name : null,
 
                     MajorId = u.AlumniProfile != null ? u.AlumniProfile.MajorId : (int?)null,
-                    MajorName = u.AlumniProfile != null ? u.AlumniProfile.Major.Name : null
+                    MajorName = u.AlumniProfile != null ? u.AlumniProfile.Major?.Name : null
                 })
                 .ToListAsync();
 
-            return Ok(users);
+            return Ok(new PagedResult<UserResponse>
+            {
+                Items = users,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            });
         }
 
         // ===================== 2. GET DETAIL =====================

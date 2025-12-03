@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QLCSV.Data;
+using QLCSV.DTOs;
 using QLCSV.DTOs.Event;
 using System.Security.Claims;
 
@@ -32,11 +33,13 @@ namespace QLCSV.Controllers
         // GET: /api/events
         // Filter: onlyUpcoming, from, to, keyword
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<EventResponse>>> GetEvents(
+        public async Task<ActionResult<PagedResult<EventResponse>>> GetEvents(
             [FromQuery] bool onlyUpcoming = true,
             [FromQuery] DateTimeOffset? from = null,
             [FromQuery] DateTimeOffset? to = null,
-            [FromQuery] string? keyword = null)
+            [FromQuery] string? keyword = null,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 20)
         {
             var now = DateTimeOffset.UtcNow;
 
@@ -70,8 +73,14 @@ namespace QLCSV.Controllers
 
             var currentUserId = GetCurrentUserId();
 
+            var totalCount = await query.CountAsync();
+            pageSize = Math.Min(pageSize, 100);
+            pageNumber = Math.Max(pageNumber, 1);
+
             var events = await query
                 .OrderBy(e => e.EventDate)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
                 .Select(e => new EventResponse
                 {
                     Id = e.Id,
@@ -96,7 +105,13 @@ namespace QLCSV.Controllers
                 })
                 .ToListAsync();
 
-            return Ok(events);
+            return Ok(new PagedResult<EventResponse>
+            {
+                Items = events,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            });
         }
 
         // GET: /api/events/{id}
@@ -283,49 +298,76 @@ namespace QLCSV.Controllers
             if (userId == null)
                 return Unauthorized();
 
-            var ev = await _context.Events
-                .Include(e => e.Registrations)
-                .FirstOrDefaultAsync(e => e.Id == id);
-
-            if (ev == null)
-                return NotFound(new { Message = "Sự kiện không tồn tại" });
-
-            if (ev.EventDate < DateTimeOffset.UtcNow)
-                return BadRequest(new { Message = "Sự kiện đã diễn ra, không thể đăng ký" });
-
-            if (ev.MaxParticipants.HasValue)
+            // Use transaction and row-level locking to prevent race conditions
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                var currentCount = ev.Registrations.Count(r => r.Status == "registered");
-                if (currentCount >= ev.MaxParticipants.Value)
-                    return BadRequest(new { Message = "Sự kiện đã đủ số lượng" });
-            }
+                var ev = await _context.Events
+                    .Include(e => e.Registrations)
+                    .FirstOrDefaultAsync(e => e.Id == id);
 
-            var existing = await _context.EventRegistrations
-                .FirstOrDefaultAsync(r => r.EventId == id && r.UserId == userId.Value);
-
-            if (existing != null && existing.Status == "registered")
-                return BadRequest(new { Message = "Bạn đã đăng ký sự kiện này rồi" });
-
-            if (existing == null)
-            {
-                existing = new QLCSV.Models.EventRegistration
+                if (ev == null)
                 {
-                    EventId = id,
-                    UserId = userId.Value,
-                    RegisteredAt = DateTimeOffset.UtcNow,
-                    Status = "registered"
-                };
-                _context.EventRegistrations.Add(existing);
+                    await transaction.RollbackAsync();
+                    return NotFound(new { Message = "Sự kiện không tồn tại" });
+                }
+
+                if (ev.EventDate < DateTimeOffset.UtcNow)
+                {
+                    await transaction.RollbackAsync();
+                    return BadRequest(new { Message = "Sự kiện đã diễn ra, không thể đăng ký" });
+                }
+
+                // Check existing registration first
+                var existing = await _context.EventRegistrations
+                    .FirstOrDefaultAsync(r => r.EventId == id && r.UserId == userId.Value);
+
+                if (existing != null && existing.Status == "registered")
+                {
+                    await transaction.RollbackAsync();
+                    return BadRequest(new { Message = "Bạn đã đăng ký sự kiện này rồi" });
+                }
+
+                // Atomic check for capacity with proper counting
+                if (ev.MaxParticipants.HasValue)
+                {
+                    var currentCount = await _context.EventRegistrations
+                        .CountAsync(r => r.EventId == id && r.Status == "registered");
+                    
+                    if (currentCount >= ev.MaxParticipants.Value)
+                    {
+                        await transaction.RollbackAsync();
+                        return BadRequest(new { Message = "Sự kiện đã đủ số lượng" });
+                    }
+                }
+
+                if (existing == null)
+                {
+                    existing = new QLCSV.Models.EventRegistration
+                    {
+                        EventId = id,
+                        UserId = userId.Value,
+                        RegisteredAt = DateTimeOffset.UtcNow,
+                        Status = "registered"
+                    };
+                    _context.EventRegistrations.Add(existing);
+                }
+                else
+                {
+                    existing.Status = "registered";
+                    existing.RegisteredAt = DateTimeOffset.UtcNow;
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new { Message = "Đăng ký sự kiện thành công" });
             }
-            else
+            catch (Exception)
             {
-                existing.Status = "registered";
-                existing.RegisteredAt = DateTimeOffset.UtcNow;
+                await transaction.RollbackAsync();
+                throw;
             }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new { Message = "Đăng ký sự kiện thành công" });
         }
 
         // POST: /api/events/{id}/cancel

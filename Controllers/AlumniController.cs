@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QLCSV.Data;
+using QLCSV.DTOs;
 using QLCSV.DTOs.Alumni;
 using System.Security.Claims;
 
@@ -22,11 +23,13 @@ namespace QLCSV.Controllers
         // Public danh sách cựu sinh viên, chỉ lấy IsPublic = true
         // Filter theo facultyId, majorId, graduationYear, city
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<AlumniPublicResponse>>> GetPublicAlumni(
+        public async Task<ActionResult<PagedResult<AlumniPublicResponse>>> GetPublicAlumni(
             [FromQuery] int? facultyId,
             [FromQuery] int? majorId,
             [FromQuery] int? graduationYear,
-            [FromQuery] string? city)
+            [FromQuery] string? city,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 20)
         {
             var query = _context.AlumniProfiles
                 .Include(a => a.User)
@@ -47,7 +50,13 @@ namespace QLCSV.Controllers
             if (!string.IsNullOrWhiteSpace(city))
                 query = query.Where(a => a.City != null && a.City.ToLower().Contains(city.ToLower()));
 
+            var totalCount = await query.CountAsync();
+            pageSize = Math.Min(pageSize, 100);
+            pageNumber = Math.Max(pageNumber, 1);
+
             var result = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
                 .Select(a => new AlumniPublicResponse
                 {
                     Id = a.Id,
@@ -67,7 +76,13 @@ namespace QLCSV.Controllers
                 })
                 .ToListAsync();
 
-            return Ok(result);
+            return Ok(new PagedResult<AlumniPublicResponse>
+            {
+                Items = result,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            });
         }
 
         // GET: /api/alumni/{id}

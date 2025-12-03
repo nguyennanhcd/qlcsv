@@ -88,6 +88,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // JWT Service
 builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 // Authentication
 builder.Services
@@ -125,21 +126,129 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+// Add request size limits (10MB default)
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10 MB
+});
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 10 * 1024 * 1024; // 10 MB
+});
+
 var app = builder.Build();
 
-// Create database tables if they don't exist
+// Handle database initialization/migration
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    
     try
     {
         var context = services.GetRequiredService<AppDbContext>();
-        context.Database.EnsureCreated();
-        Console.WriteLine("✅ Database tables created successfully!");
+        
+        // Check if we can connect to the database
+        var canConnect = await context.Database.CanConnectAsync();
+        
+        if (!canConnect)
+        {
+            logger.LogInformation("Creating new database...");
+            await context.Database.MigrateAsync();
+            Console.WriteLine("✅ Database created successfully!");
+        }
+        else
+        {
+            // Database exists - check if it was created with EnsureCreated or has migrations
+            var hasTablesButNoMigrations = false;
+            
+            try
+            {
+                // Try to check if tables exist
+                var tablesExist = await context.Users.AnyAsync();
+                var appliedMigrations = await context.Database.GetAppliedMigrationsAsync();
+                
+                // If we have tables but no migration history, database was created with EnsureCreated
+                hasTablesButNoMigrations = !appliedMigrations.Any();
+            }
+            catch
+            {
+                // If we get here, tables might not exist or other issue
+                hasTablesButNoMigrations = false;
+            }
+            
+            if (hasTablesButNoMigrations)
+            {
+                // Production database created with EnsureCreated - add columns manually
+                logger.LogInformation("Detected existing database. Ensuring schema compatibility...");
+                
+                try
+                {
+                    // Add new columns if they don't exist (PostgreSQL safe syntax)
+                    await context.Database.ExecuteSqlRawAsync(@"
+                        DO $$ 
+                        BEGIN
+                            -- Add email verification columns
+                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                          WHERE table_name='users' AND column_name='EmailVerified') THEN
+                                ALTER TABLE users ADD COLUMN ""EmailVerified"" boolean NOT NULL DEFAULT false;
+                            END IF;
+                            
+                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                          WHERE table_name='users' AND column_name='EmailVerificationToken') THEN
+                                ALTER TABLE users ADD COLUMN ""EmailVerificationToken"" text;
+                            END IF;
+                            
+                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                          WHERE table_name='users' AND column_name='EmailVerificationTokenExpiry') THEN
+                                ALTER TABLE users ADD COLUMN ""EmailVerificationTokenExpiry"" timestamp with time zone;
+                            END IF;
+                            
+                            -- Add password reset columns
+                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                          WHERE table_name='users' AND column_name='PasswordResetToken') THEN
+                                ALTER TABLE users ADD COLUMN ""PasswordResetToken"" text;
+                            END IF;
+                            
+                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                          WHERE table_name='users' AND column_name='PasswordResetTokenExpiry') THEN
+                                ALTER TABLE users ADD COLUMN ""PasswordResetTokenExpiry"" timestamp with time zone;
+                            END IF;
+                        END $$;
+                    ");
+                    
+                    Console.WriteLine("✅ Database schema updated successfully!");
+                }
+                catch (Exception schemaEx)
+                {
+                    logger.LogWarning(schemaEx, "Could not update schema automatically");
+                    Console.WriteLine("⚠️  Schema update skipped - database may need manual migration");
+                }
+            }
+            else
+            {
+                // Normal migration flow
+                var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
+                
+                if (pendingMigrations.Any())
+                {
+                    logger.LogInformation("Applying {Count} pending migration(s)...", pendingMigrations.Count());
+                    await context.Database.MigrateAsync();
+                    Console.WriteLine("✅ Database migrations applied successfully!");
+                }
+                else
+                {
+                    Console.WriteLine("✅ Database is up to date!");
+                }
+            }
+        }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Database Error: {ex.Message}");
+        logger.LogError(ex, "Database initialization error");
+        Console.WriteLine($"⚠️  Database Error: {ex.Message}");
+        Console.WriteLine("⚠️  Application will continue. Database operations may fail if schema is incompatible.");
     }
 }
 

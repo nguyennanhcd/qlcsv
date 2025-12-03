@@ -16,11 +16,13 @@ namespace QLCSV.Controllers.Auth
     {
         private readonly AppDbContext _context;
         private readonly IJwtService _jwtService;
+        private readonly IEmailService _emailService;
 
-        public AuthController(AppDbContext context, IJwtService jwtService)
+        public AuthController(AppDbContext context, IJwtService jwtService, IEmailService emailService)
         {
             _context = context;
             _jwtService = jwtService;
+            _emailService = emailService;
         }
 
         // POST: /api/auth/register
@@ -30,22 +32,40 @@ namespace QLCSV.Controllers.Auth
             if (await _context.Users.AnyAsync(u => u.Email == request.Email))
                 return Conflict(new RegisterResponse { Success = false, Message = "Email đã được sử dụng" });
 
+            var verificationToken = Guid.NewGuid().ToString("N");
+
             var user = new User
             {
                 Email = request.Email,
                 FullName = request.FullName,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
                 Role = "pending",
-                IsActive = true
+                IsActive = true,
+                EmailVerified = false,
+                EmailVerificationToken = verificationToken,
+                EmailVerificationTokenExpiry = DateTimeOffset.UtcNow.AddHours(24)
             };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
+            // Send verification email (don't wait, run in background)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _emailService.SendEmailVerificationAsync(user.Email, user.FullName, verificationToken);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to send verification email: {ex.Message}");
+                }
+            });
+
             return Ok(new RegisterResponse
             {
                 Success = true,
-                Message = "Đăng ký thành công! Vui lòng hoàn thiện hồ sơ.",
+                Message = "Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.",
                 Token = _jwtService.GenerateToken(user),
                 UserId = user.Id
             });
@@ -147,6 +167,7 @@ namespace QLCSV.Controllers.Auth
                 user.FullName,
                 user.Email,
                 user.Role,
+                user.EmailVerified,
                 Profile = user.AlumniProfile == null ? null : new
                 {
                     user.AlumniProfile.StudentId,
@@ -159,6 +180,127 @@ namespace QLCSV.Controllers.Auth
                     user.AlumniProfile.IsPublic
                 }
             });
+        }
+
+        // POST: /api/auth/verify-email
+        [HttpPost("verify-email")]
+        public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.EmailVerificationToken == request.Token);
+
+            if (user == null)
+                return BadRequest(new { Success = false, Message = "Token không hợp lệ" });
+
+            if (user.EmailVerified)
+                return Ok(new { Success = true, Message = "Email đã được xác thực trước đó" });
+
+            if (user.EmailVerificationTokenExpiry < DateTimeOffset.UtcNow)
+                return BadRequest(new { Success = false, Message = "Token đã hết hạn. Vui lòng yêu cầu gửi lại email xác thực." });
+
+            user.EmailVerified = true;
+            user.EmailVerificationToken = null;
+            user.EmailVerificationTokenExpiry = null;
+            user.UpdatedAt = DateTimeOffset.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Success = true, Message = "Xác thực email thành công!" });
+        }
+
+        // POST: /api/auth/resend-verification
+        [Authorize]
+        [HttpPost("resend-verification")]
+        public async Task<IActionResult> ResendVerification()
+        {
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userIdClaim) || !long.TryParse(userIdClaim, out var userId))
+                return Unauthorized();
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                return NotFound(new { Success = false, Message = "User không tồn tại" });
+
+            if (user.EmailVerified)
+                return BadRequest(new { Success = false, Message = "Email đã được xác thực rồi" });
+
+            var verificationToken = Guid.NewGuid().ToString("N");
+            user.EmailVerificationToken = verificationToken;
+            user.EmailVerificationTokenExpiry = DateTimeOffset.UtcNow.AddHours(24);
+            user.UpdatedAt = DateTimeOffset.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            // Send verification email
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _emailService.SendEmailVerificationAsync(user.Email, user.FullName, verificationToken);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to send verification email: {ex.Message}");
+                }
+            });
+
+            return Ok(new { Success = true, Message = "Email xác thực đã được gửi lại" });
+        }
+
+        // POST: /api/auth/forgot-password
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+
+            // Don't reveal if email exists or not (security best practice)
+            if (user == null)
+                return Ok(new { Success = true, Message = "Nếu email tồn tại, link đặt lại mật khẩu đã được gửi" });
+
+            var resetToken = Guid.NewGuid().ToString("N");
+            user.PasswordResetToken = resetToken;
+            user.PasswordResetTokenExpiry = DateTimeOffset.UtcNow.AddHours(1);
+            user.UpdatedAt = DateTimeOffset.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            // Send password reset email
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _emailService.SendPasswordResetAsync(user.Email, user.FullName, resetToken);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to send password reset email: {ex.Message}");
+                }
+            });
+
+            return Ok(new { Success = true, Message = "Nếu email tồn tại, link đặt lại mật khẩu đã được gửi" });
+        }
+
+        // POST: /api/auth/reset-password
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.PasswordResetToken == request.Token);
+
+            if (user == null)
+                return BadRequest(new { Success = false, Message = "Token không hợp lệ" });
+
+            if (user.PasswordResetTokenExpiry < DateTimeOffset.UtcNow)
+                return BadRequest(new { Success = false, Message = "Token đã hết hạn. Vui lòng yêu cầu đặt lại mật khẩu mới." });
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            user.PasswordResetToken = null;
+            user.PasswordResetTokenExpiry = null;
+            user.UpdatedAt = DateTimeOffset.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Success = true, Message = "Đặt lại mật khẩu thành công!" });
         }
     }
 }
