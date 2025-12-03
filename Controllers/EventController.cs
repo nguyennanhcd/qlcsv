@@ -56,10 +56,9 @@ namespace QLCSV.Controllers
 
             if (!string.IsNullOrWhiteSpace(keyword))
             {
-                var lower = keyword.ToLower();
                 query = query.Where(e =>
-                    e.Title.ToLower().Contains(lower) ||
-                    (e.Description != null && e.Description.ToLower().Contains(lower)));
+                    EF.Functions.ILike(e.Title, $"%{keyword}%") ||
+                    (e.Description != null && EF.Functions.ILike(e.Description, $"%{keyword}%")));
             }
 
             var currentUserId = GetCurrentUserId();
@@ -416,16 +415,27 @@ namespace QLCSV.Controllers
         // GET: /api/events/{id}/registrations  (ADMIN)
         [Authorize(Roles = "admin")]
         [HttpGet("{id:long}/registrations")]
-        public async Task<ActionResult<IEnumerable<EventRegistrationUserResponse>>> GetRegistrationsByEvent(long id)
+        public async Task<ActionResult<PagedResult<EventRegistrationUserResponse>>> GetRegistrationsByEvent(
+            long id,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 50)
         {
             var exists = await _context.Events.AnyAsync(e => e.Id == id);
             if (!exists)
                 return NotFound(new { Message = "Sự kiện không tồn tại" });
 
-            var regs = await _context.EventRegistrations
+            var query = _context.EventRegistrations
                 .Include(r => r.User)
-                .Where(r => r.EventId == id)
+                .Where(r => r.EventId == id);
+
+            var totalCount = await query.CountAsync();
+            pageSize = Math.Min(pageSize, 200);
+            pageNumber = Math.Max(pageNumber, 1);
+
+            var regs = await query
                 .OrderBy(r => r.RegisteredAt)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
                 .Select(r => new EventRegistrationUserResponse
                 {
                     UserId = r.UserId,
@@ -436,7 +446,13 @@ namespace QLCSV.Controllers
                 })
                 .ToListAsync();
 
-            return Ok(regs);
+            return Ok(new PagedResult<EventRegistrationUserResponse>
+            {
+                Items = regs,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            });
         }
     }
 }

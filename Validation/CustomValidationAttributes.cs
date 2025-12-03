@@ -86,4 +86,39 @@ namespace QLCSV.Validation
             return new ValidationResult(ErrorMessage);
         }
     }
+
+    /// <summary>
+    /// Validates that a field is required when IsOnline is true
+    /// </summary>
+    public class RequiredIfOnlineAttribute : ValidationAttribute
+    {
+        private readonly string _isOnlinePropertyName;
+
+        public RequiredIfOnlineAttribute(string isOnlinePropertyName)
+        {
+            _isOnlinePropertyName = isOnlinePropertyName;
+            ErrorMessage = "Trường này là bắt buộc cho sự kiện trực tuyến";
+        }
+
+        protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
+        {
+            var isOnlineProperty = validationContext.ObjectType.GetProperty(_isOnlinePropertyName);
+            if (isOnlineProperty == null)
+            {
+                return new ValidationResult($"Property {_isOnlinePropertyName} not found");
+            }
+
+            var isOnlineValue = isOnlineProperty.GetValue(validationContext.ObjectInstance);
+            
+            // Check if IsOnline is true
+            bool isOnline = isOnlineValue is bool boolValue && boolValue;
+            
+            if (isOnline && string.IsNullOrWhiteSpace(value?.ToString()))
+            {
+                return new ValidationResult(ErrorMessage);
+            }
+
+            return ValidationResult.Success;
+        }
+    }
 }

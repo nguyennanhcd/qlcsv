@@ -20,6 +20,7 @@ namespace QLCSV.DTOs.Event
 
         public bool IsOnline { get; set; } = false;
 
+        [RequiredIfOnline(nameof(IsOnline), ErrorMessage = "Link họp không được để trống cho sự kiện trực tuyến")]
         [ValidUrl]
         [StringLength(500, ErrorMessage = "Link họp tối đa 500 ký tự")]
         public string? MeetLink { get; set; }

@@ -48,7 +48,7 @@ namespace QLCSV.Controllers
                 query = query.Where(a => a.GraduationYear == graduationYear.Value);
 
             if (!string.IsNullOrWhiteSpace(city))
-                query = query.Where(a => a.City != null && a.City.ToLower().Contains(city.ToLower()));
+                query = query.Where(a => a.City != null && EF.Functions.ILike(a.City, $"%{city}%"));
 
             var totalCount = await query.CountAsync();
             pageSize = Math.Min(pageSize, 100);

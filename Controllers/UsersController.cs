@@ -49,10 +49,9 @@ namespace QLCSV.Controllers
 
             if (!string.IsNullOrWhiteSpace(search))
             {
-                var lower = search.ToLower();
                 query = query.Where(u =>
-                    u.FullName.ToLower().Contains(lower) ||
-                    u.Email.ToLower().Contains(lower));
+                    EF.Functions.ILike(u.FullName, $"%{search}%") ||
+                    EF.Functions.ILike(u.Email, $"%{search}%"));
             }
 
             var totalCount = await query.CountAsync();

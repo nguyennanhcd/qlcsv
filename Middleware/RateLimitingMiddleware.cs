@@ -32,7 +32,7 @@ namespace QLCSV.Middleware
                 lock (counter)
                 {
                     // Clean up old requests outside the time window
-                    counter.Requests.RemoveAll(r => DateTime.UtcNow - r > _timeWindow);
+                    counter.Requests.RemoveAll(r => DateTimeOffset.UtcNow - r > _timeWindow);
 
                     if (counter.Requests.Count >= MaxRequestsPerWindow)
                     {
@@ -40,7 +40,7 @@ namespace QLCSV.Middleware
                     }
                     else
                     {
-                        counter.Requests.Add(DateTime.UtcNow);
+                        counter.Requests.Add(DateTimeOffset.UtcNow);
                     }
                 }
 
@@ -80,7 +80,7 @@ namespace QLCSV.Middleware
         private void CleanupOldEntries()
         {
             var keysToRemove = _requestCounters
-                .Where(kvp => DateTime.UtcNow - kvp.Value.LastRequest > TimeSpan.FromHours(1))
+                .Where(kvp => DateTimeOffset.UtcNow - kvp.Value.LastRequest > TimeSpan.FromHours(1))
                 .Select(kvp => kvp.Key)
                 .ToList();
 
@@ -92,8 +92,8 @@ namespace QLCSV.Middleware
 
         private class RequestCounter
         {
-            public List<DateTime> Requests { get; set; } = new();
-            public DateTime LastRequest => Requests.LastOrDefault();
+            public List<DateTimeOffset> Requests { get; set; } = new();
+            public DateTimeOffset LastRequest => Requests.LastOrDefault();
         }
     }
 

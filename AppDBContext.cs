@@ -52,6 +52,9 @@ namespace QLCSV.Data
                 entity.HasIndex(u => u.Email).IsUnique();
                 entity.Property(u => u.Email).HasMaxLength(255).IsRequired();
 
+                // Index for email verification token lookup
+                entity.HasIndex(u => u.EmailVerificationToken);
+
                 entity.Property(u => u.PasswordHash).HasMaxLength(255).IsRequired();
                 entity.Property(u => u.FullName).HasMaxLength(255).IsRequired();
 

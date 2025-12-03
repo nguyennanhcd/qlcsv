@@ -221,20 +221,17 @@ namespace QLCSV.Controllers.Auth
         }
 
         // POST: /api/auth/resend-verification
-        [Authorize]
         [HttpPost("resend-verification")]
-        public async Task<IActionResult> ResendVerification()
+        public async Task<IActionResult> ResendVerification([FromBody] ForgotPasswordRequest request)
         {
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdClaim) || !long.TryParse(userIdClaim, out var userId))
-                return Unauthorized();
-
-            var user = await _context.Users.FindAsync(userId);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+            
+            // Don't reveal if email exists or not (security)
             if (user == null)
-                return NotFound(new { Success = false, Message = "User không tồn tại" });
+                return Ok(new { Success = true, Message = "Nếu email tồn tại, email xác thực đã được gửi lại" });
 
             if (user.EmailVerified)
-                return BadRequest(new { Success = false, Message = "Email đã được xác thực rồi" });
+                return Ok(new { Success = true, Message = "Email đã được xác thực rồi" });
 
             var verificationToken = Guid.NewGuid().ToString("N");
             user.EmailVerificationToken = verificationToken;
