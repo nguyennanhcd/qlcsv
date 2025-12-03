@@ -83,6 +83,9 @@ namespace QLCSV.Controllers.Auth
             if (!user.IsActive)
                 return Unauthorized(new LoginResponse { Success = false, Message = "Tài khoản đã bị khóa" });
 
+            if (!user.EmailVerified)
+                return Unauthorized(new LoginResponse { Success = false, Message = "Vui lòng xác thực email trước khi đăng nhập. Kiểm tra hộp thư của bạn." });
+
             bool profileCompleted = await _context.AlumniProfiles.AnyAsync(p => p.UserId == user.Id);
 
             return Ok(new LoginResponse
