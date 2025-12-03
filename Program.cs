@@ -141,7 +141,7 @@ builder.WebHost.ConfigureKestrel(options =>
 
 var app = builder.Build();
 
-// Apply database migrations
+// Apply database migrations and seed data
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -150,10 +150,14 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<AppDbContext>();
+        var configuration = services.GetRequiredService<IConfiguration>();
         
         logger.LogInformation("Applying database migrations...");
         await context.Database.MigrateAsync();
         Console.WriteLine("✅ Database migrations applied successfully!");
+        
+        // Seed initial data (admin user)
+        await QLCSV.Data.DbSeeder.SeedAsync(context, configuration);
     }
     catch (Exception ex)
     {
