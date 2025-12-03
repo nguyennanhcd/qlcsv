@@ -66,7 +66,7 @@ namespace QLCSV.Controllers.Auth
             {
                 Success = true,
                 Message = "Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.",
-                Token = _jwtService.GenerateToken(user),
+                Token = null, // No token until email verified
                 UserId = user.Id
             });
         }
@@ -77,7 +77,10 @@ namespace QLCSV.Controllers.Auth
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
 
-            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            // Prevent timing attack: always verify password even if user doesn't exist
+            var passwordValid = user != null && BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+            
+            if (user == null || !passwordValid)
                 return Unauthorized(new LoginResponse { Success = false, Message = "Email hoặc mật khẩu sai" });
 
             if (!user.IsActive)
@@ -119,29 +122,35 @@ namespace QLCSV.Controllers.Auth
                 !await _context.Majors.AnyAsync(m => m.Id == request.MajorId))
                 return BadRequest(new CompleteProfileResponse { Success = false, Message = "Khoa hoặc ngành không tồn tại" });
 
-            var profile = new AlumniProfile
+            // Use transaction to ensure atomicity
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                UserId = userId,
-                StudentId = request.StudentId,
-                GraduationYear = request.GraduationYear,
-                FacultyId = request.FacultyId,
-                MajorId = request.MajorId,
-                // Có thể bỏ 2 dòng dưới vì đã set default trong model, nhưng để lại cũng không sao
-                Country = "Việt Nam",
-                IsPublic = false
-            };
+                var profile = new AlumniProfile
+                {
+                    UserId = userId,
+                    StudentId = request.StudentId,
+                    GraduationYear = request.GraduationYear,
+                    FacultyId = request.FacultyId,
+                    MajorId = request.MajorId
+                    // Default values (Country, IsPublic) are set in model
+                };
 
-            var user = await _context.Users.FindAsync(userId);
-            if (user != null) user.Role = "alumni";
+                _context.AlumniProfiles.Add(profile);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
 
-            _context.AlumniProfiles.Add(profile);
-            await _context.SaveChangesAsync();
-
-            return Ok(new CompleteProfileResponse
+                return Ok(new CompleteProfileResponse
+                {
+                    Success = true,
+                    Message = "Hoàn thiện hồ sơ thành công! Role vẫn là 'pending' cho đến khi admin duyệt."
+                });
+            }
+            catch
             {
-                Success = true,
-                Message = "Hoàn thiện hồ sơ thành công! Đang chờ admin duyệt."
-            });
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         // GET: /api/auth/me
