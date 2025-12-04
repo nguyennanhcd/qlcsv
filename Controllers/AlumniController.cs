@@ -114,7 +114,7 @@ namespace QLCSV.Controllers
 
         // GET: /api/alumni/me
         // Lấy hồ sơ chi tiết của chính mình
-        [Authorize]
+        [Authorize(Roles = "alumni,admin")]
         [HttpGet("me")]
         public async Task<ActionResult<AlumniDetailResponse>> GetMyProfile()
         {
@@ -137,7 +137,7 @@ namespace QLCSV.Controllers
 
         // PUT: /api/alumni/me
         // Cập nhật hồ sơ của chính mình
-        [Authorize]
+        [Authorize(Roles = "alumni,admin")]
         [HttpPut("me")]
         public async Task<ActionResult<AlumniDetailResponse>> UpdateMyProfile(
             [FromBody] AlumniUpdateRequest request)
@@ -195,8 +195,8 @@ namespace QLCSV.Controllers
         }
 
         // PUT: /api/alumni/me/privacy
-        // Toggle nhanh IsPublic
-        [Authorize]
+        // Toggle IsPublic
+        [Authorize(Roles = "alumni,admin")]
         [HttpPut("me/privacy")]
         public async Task<IActionResult> UpdateMyPrivacy(
             [FromBody] AlumniPrivacyUpdateRequest request)

@@ -311,5 +311,25 @@ namespace QLCSV.Controllers.Auth
 
             return Ok(new { Success = true, Message = "Đặt lại mật khẩu thành công!" });
         }
+
+        // POST: /api/auth/logout
+        // Note: JWT is stateless, so logout is handled client-side by deleting the token.
+        // This endpoint exists for documentation and consistency with traditional auth flows.
+        [Authorize]
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            // In a stateless JWT system, the client simply discards the token
+            // For enhanced security, you could implement:
+            // 1. Token blacklist/revocation list (requires Redis or database)
+            // 2. Short-lived tokens with refresh token rotation
+            // 3. Logout all devices by incrementing a user version number
+            
+            return Ok(new 
+            { 
+                Success = true, 
+                Message = "Đăng xuất thành công. Vui lòng xóa token ở phía client." 
+            });
+        }
     }
 }

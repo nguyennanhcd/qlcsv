@@ -280,7 +280,7 @@ namespace QLCSV.Controllers
         // ===================== USER REGISTRATION =====================
 
         // POST: /api/events/{id}/register
-        [Authorize]
+        [Authorize(Roles = "alumni,admin")]
         [HttpPost("{id:long}/register")]
         public async Task<IActionResult> RegisterEvent(long id)
         {
@@ -361,7 +361,7 @@ namespace QLCSV.Controllers
         }
 
         // POST: /api/events/{id}/cancel
-        [Authorize]
+        [Authorize(Roles = "alumni,admin")]
         [HttpPost("{id:long}/cancel")]
         public async Task<IActionResult> CancelRegistration(long id)
         {
@@ -382,7 +382,7 @@ namespace QLCSV.Controllers
         }
 
         // GET: /api/events/my-registrations
-        [Authorize]
+        [Authorize(Roles = "alumni,admin")]
         [HttpGet("my-registrations")]
         public async Task<ActionResult<IEnumerable<MyEventRegistrationResponse>>> GetMyRegistrations()
         {
