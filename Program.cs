@@ -59,15 +59,15 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     var conn = builder.Configuration.GetConnectionString("DefaultConnection");
-    var renderConn = Environment.GetEnvironmentVariable("DATABASE_URL");
+    var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
 
-    // Parse Render.com DATABASE_URL format: postgres://user:password@host:port/database
-    if (!string.IsNullOrWhiteSpace(renderConn))
+    // Parse Railway/PostgreSQL DATABASE_URL format: postgres://user:password@host:port/database
+    if (!string.IsNullOrWhiteSpace(databaseUrl))
     {
         try
         {
             // Replace postgres:// with postgresql:// for proper URI parsing
-            var uriString = renderConn.Replace("postgres://", "postgresql://");
+            var uriString = databaseUrl.Replace("postgres://", "postgresql://");
             var uri = new Uri(uriString);
             var db = uri.AbsolutePath.Trim('/');
             var userInfo = uri.UserInfo.Split(':');
@@ -79,7 +79,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
             // Log the error for debugging
             Console.WriteLine($"Failed to parse DATABASE_URL: {ex.Message}");
             // If parsing fails, try using as-is
-            conn = renderConn;
+            conn = databaseUrl;
         }
     }
 
