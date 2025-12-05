@@ -7,38 +7,62 @@ Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure services
+// bật api controller
 builder.Services.AddControllers();
+// cho phép khám phá endpoint cho swagger
 builder.Services.AddEndpointsApiExplorer();
 
-// Add custom services via extension methods
+
+
 builder.Services.AddDatabaseServices(builder.Configuration);
 builder.Services.AddAuthenticationServices(builder.Configuration);
 builder.Services.AddApplicationServices();
 builder.Services.AddSwaggerServices();
 
-// Configure web server
+// cấu hình web server
 builder.WebHost.ConfigureWebServer();
 
+// build ứng dụng
 var app = builder.Build();
 
-// Apply database migrations and seed data
+// Tự động chạy EF Core migrations khi app khởi động Generate DB và seed data mặc định
 await app.UseDatabaseMigrationAsync();
 
-// Configure middleware pipeline
+// cấu hình middleware trong pipeline
+// global error handler
 app.UseGlobalExceptionHandler();
+// rate limiting
 app.UseRateLimiting();
+// Bật Swagger UI chỉ trong môi trường phù hợp.
 app.UseSwaggerConfiguration(app.Environment);
 
+
+/*
+
+Thêm headers bảo mật như:
+
+X-Frame-Options
+
+X-Content-Type-Options
+
+Content-Security-Policy
+
+HSTS
+→ Chỉ bật khi không phải development để dev đỡ bị vướng
+*/
 if (!app.Environment.IsDevelopment())
 {
     app.UseSecurityHeaders();
 }
 
+// chuyển hướng HTTP sang HTTPS
 app.UseHttpsRedirection();
+
+// xác thực và phân quyền
 app.UseAuthentication();
 app.UseAuthorization();
 
+//Bật API routing theo attribute như [HttpGet], [Route("api/...")]
 app.MapControllers();
 
 app.Run();

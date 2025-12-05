@@ -9,14 +9,9 @@ using System.Text;
 
 namespace QLCSV.Extensions
 {
-    /// <summary>
-    /// Extension methods for configuring services in the DI container
-    /// </summary>
+
     public static class ServiceCollectionExtensions
     {
-        /// <summary>
-        /// Adds database context with PostgreSQL configuration
-        /// </summary>
         public static IServiceCollection AddDatabaseServices(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddDbContext<AppDbContext>(options =>

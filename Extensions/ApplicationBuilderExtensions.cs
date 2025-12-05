@@ -4,14 +4,8 @@ using QLCSV.Middleware;
 
 namespace QLCSV.Extensions
 {
-    /// <summary>
-    /// Extension methods for configuring the HTTP request pipeline
-    /// </summary>
     public static class ApplicationBuilderExtensions
     {
-        /// <summary>
-        /// Applies database migrations and seeds initial data
-        /// </summary>
         public static async Task<IApplicationBuilder> UseDatabaseMigrationAsync(this IApplicationBuilder app)
         {
             using (var scope = app.ApplicationServices.CreateScope())
