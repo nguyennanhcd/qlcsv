@@ -36,9 +36,6 @@ namespace QLCSV.Extensions
             return app;
         }
 
-        /// <summary>
-        /// Adds security headers for production environment
-        /// </summary>
         public static IApplicationBuilder UseSecurityHeaders(this IApplicationBuilder app)
         {
             return app.Use(async (context, next) =>
@@ -51,9 +48,6 @@ namespace QLCSV.Extensions
             });
         }
 
-        /// <summary>
-        /// Configures Swagger UI based on environment
-        /// </summary>
         public static IApplicationBuilder UseSwaggerConfiguration(this IApplicationBuilder app, IWebHostEnvironment env)
         {
             if (env.IsDevelopment())

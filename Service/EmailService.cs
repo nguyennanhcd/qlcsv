@@ -18,8 +18,9 @@ namespace QLCSV.Service
         public async Task SendEmailVerificationAsync(string toEmail, string fullName, string verificationToken)
         {
             var subject = "Xác thực tài khoản QLCSV";
-            var verifyUrl = $"{_config["AppUrl"]}/verify-email?token={verificationToken}";
-            
+            var appUrl = Environment.GetEnvironmentVariable("APP_URL") ?? "http://localhost:5083";
+            var verifyUrl = $"{appUrl}/verify-email?token={verificationToken}";
+
             var body = $@"
                 <h2>Xin chào {fullName},</h2>
                 <p>Cảm ơn bạn đã đăng ký tài khoản QLCSV.</p>
@@ -38,8 +39,9 @@ namespace QLCSV.Service
         public async Task SendPasswordResetAsync(string toEmail, string fullName, string resetToken)
         {
             var subject = "Đặt lại mật khẩu QLCSV";
-            var resetUrl = $"{_config["AppUrl"]}/reset-password?token={resetToken}";
-            
+            var appUrl = Environment.GetEnvironmentVariable("APP_URL") ?? "http://localhost:5083";
+            var resetUrl = $"{appUrl}/reset-password?token={resetToken}";
+
             var body = $@"
                 <h2>Xin chào {fullName},</h2>
                 <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.</p>
@@ -57,16 +59,16 @@ namespace QLCSV.Service
 
         private async Task SendEmailAsync(string toEmail, string subject, string body)
         {
-            var apiKey = _config["Resend:ApiKey"];
-            
+            var apiKey = Environment.GetEnvironmentVariable("RESEND_API_KEY");
+
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 _logger.LogWarning("Resend API not configured. Email not sent to {Email}", toEmail);
                 return;
             }
 
-            var fromEmail = _config["Resend:FromEmail"] ?? "onboarding@resend.dev";
-            var fromName = _config["Resend:FromName"] ?? "QLCSV";
+            var fromEmail = Environment.GetEnvironmentVariable("RESEND_FROM_EMAIL") ?? "onboarding@resend.dev";
+            var fromName = Environment.GetEnvironmentVariable("RESEND_FROM_NAME") ?? "QLCSV Alumni System";
 
             try
             {

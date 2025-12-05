@@ -7,12 +7,17 @@ Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
+// dependency injection
 // bật api controller
 builder.Services.AddControllers();
 // cho phép khám phá endpoint cho swagger
 builder.Services.AddEndpointsApiExplorer();
 
-
+// viết theo kiểu fluent api
+// services
+//     .AddDatabaseServices()
+//     .AddAuthenticationServices()
+//     .AddSwaggerServices();
 
 builder.Services.AddDatabaseServices(builder.Configuration);
 builder.Services.AddAuthenticationServices(builder.Configuration);
@@ -55,6 +60,8 @@ if (!app.Environment.IsDevelopment())
     app.UseSecurityHeaders();
 }
 
+
+// ASP.Net middleware
 // chuyển hướng HTTP sang HTTPS
 app.UseHttpsRedirection();
 

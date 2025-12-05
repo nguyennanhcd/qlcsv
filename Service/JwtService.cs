@@ -19,14 +19,15 @@ namespace QLCSV.Service
         public string GenerateToken(User user)
         {
             // Try environment variable first, fallback to config
-            var keyString = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") 
+            var keyString = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
                            ?? _config["Jwt:Key"];
-            
+
             if (string.IsNullOrWhiteSpace(keyString))
                 throw new InvalidOperationException("JWT_SECRET_KEY is not configured");
 
             // Lấy số ngày hết hạn, nếu không cấu hình thì mặc định 7 ngày
-            var expireDays = _config.GetValue<int?>("Jwt:ExpireDays") ?? 7;
+            var expireDaysStr = Environment.GetEnvironmentVariable("JWT_EXPIRE_DAYS");
+            var expireDays = int.TryParse(expireDaysStr, out var days) ? days : 7;
 
             var claims = new[]
             {
@@ -39,8 +40,8 @@ namespace QLCSV.Service
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
-                issuer: _config["Jwt:Issuer"],
-                audience: _config["Jwt:Audience"],
+                issuer: Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "qlcsv-api",
+                audience: Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "qlcsv-client",
                 claims: claims,
                 expires: DateTime.UtcNow.AddDays(expireDays),
                 signingCredentials: creds
@@ -50,4 +51,3 @@ namespace QLCSV.Service
         }
     }
 }
-    

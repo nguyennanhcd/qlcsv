@@ -17,17 +17,9 @@ namespace QLCSV.Data
             Console.WriteLine("Creating default admin user...");
 
             // Get admin credentials from environment variables or use defaults
-            var adminEmail = Environment.GetEnvironmentVariable("ADMIN_EMAIL") 
-                           ?? configuration["AdminUser:Email"] 
-                           ?? "admin@qlcsv.com";
-            
-            var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") 
-                              ?? configuration["AdminUser:Password"] 
-                              ?? "Admin@123456";
-            
-            var adminName = Environment.GetEnvironmentVariable("ADMIN_NAME") 
-                          ?? configuration["AdminUser:FullName"] 
-                          ?? "System Administrator";
+            var adminEmail = Environment.GetEnvironmentVariable("ADMIN_EMAIL") ?? "admin@qlcsv.com";
+            var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin@123456";
+            var adminName = Environment.GetEnvironmentVariable("ADMIN_NAME") ?? "System Administrator";
 
             // Create admin user
             var adminUser = new User

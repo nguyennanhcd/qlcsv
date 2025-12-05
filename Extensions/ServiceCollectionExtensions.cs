@@ -10,8 +10,10 @@ using System.Text;
 namespace QLCSV.Extensions
 {
 
+    // dùng extension method để tách bớt code trong Program.cs, và thêm các method mà IServiceCollection không có sẵn
     public static class ServiceCollectionExtensions
     {
+        //Lấy connection string;Parse DATABASE_URL nếu deploy Railway/Render/Heroku;    Đăng ký DbContext:
         public static IServiceCollection AddDatabaseServices(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddDbContext<AppDbContext>(options =>
@@ -30,7 +32,13 @@ namespace QLCSV.Extensions
                         var db = uri.AbsolutePath.Trim('/');
                         var userInfo = uri.UserInfo.Split(':');
                         var port = uri.Port > 0 ? uri.Port : 5432; // Default to 5432 if port not specified
-                        conn = $"Host={uri.Host};Port={port};Database={db};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
+
+                        // Use SSL only for production (non-localhost hosts)
+                        var sslMode = uri.Host == "localhost" || uri.Host == "127.0.0.1"
+                            ? "Disable"
+                            : "Require";
+
+                        conn = $"Host={uri.Host};Port={port};Database={db};Username={userInfo[0]};Password={userInfo[1]};SSL Mode={sslMode};Trust Server Certificate=true";
                     }
                     catch (Exception ex)
                     {
@@ -47,9 +55,7 @@ namespace QLCSV.Extensions
             return services;
         }
 
-        /// <summary>
-        /// Adds JWT-based authentication and authorization services
-        /// </summary>
+
         public static IServiceCollection AddAuthenticationServices(this IServiceCollection services, IConfiguration configuration)
         {
             services
@@ -76,8 +82,8 @@ namespace QLCSV.Extensions
                         ValidateAudience = true,
                         ValidateLifetime = true,
                         ValidateIssuerSigningKey = true,
-                        ValidIssuer = configuration["Jwt:Issuer"],
-                        ValidAudience = configuration["Jwt:Audience"],
+                        ValidIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "qlcsv-api",
+                        ValidAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "qlcsv-client",
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
                         ClockSkew = TimeSpan.Zero,
                         RoleClaimType = ClaimTypes.Role,
@@ -90,9 +96,6 @@ namespace QLCSV.Extensions
             return services;
         }
 
-        /// <summary>
-        /// Adds application-specific services (JWT, Email, etc.)
-        /// </summary>
         public static IServiceCollection AddApplicationServices(this IServiceCollection services)
         {
             // HttpClient for EmailService
@@ -110,9 +113,6 @@ namespace QLCSV.Extensions
             return services;
         }
 
-        /// <summary>
-        /// Adds Swagger/OpenAPI with JWT authentication support
-        /// </summary>
         public static IServiceCollection AddSwaggerServices(this IServiceCollection services)
         {
             services.AddSwaggerGen(options =>
@@ -154,9 +154,6 @@ namespace QLCSV.Extensions
             return services;
         }
 
-        /// <summary>
-        /// Configures Kestrel server options (request size limits)
-        /// </summary>
         public static IWebHostBuilder ConfigureWebServer(this IWebHostBuilder webHost)
         {
             webHost.ConfigureKestrel(options =>

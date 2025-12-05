@@ -2,9 +2,7 @@ using System.Collections.Concurrent;
 
 namespace QLCSV.Middleware
 {
-    /// <summary>
-    /// Simple rate limiting middleware to prevent brute force attacks
-    /// </summary>
+
     public class RateLimitingMiddleware
     {
         private readonly RequestDelegate _next;
@@ -21,14 +19,14 @@ namespace QLCSV.Middleware
         {
             // Only apply rate limiting to authentication endpoints
             var path = context.Request.Path.Value?.ToLower() ?? "";
-            
+
             if (path.Contains("/api/auth/login") || path.Contains("/api/auth/register"))
             {
                 var clientId = GetClientIdentifier(context);
                 var counter = _requestCounters.GetOrAdd(clientId, _ => new RequestCounter());
 
                 bool rateLimitExceeded = false;
-                
+
                 lock (counter)
                 {
                     // Clean up old requests outside the time window
